@@ -1,0 +1,249 @@
+package com.example.data.repository
+
+import android.util.Log
+import androidx.room.withTransaction
+import com.example.data.local.*
+import com.example.data.local.entities.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.UUID
+
+class FinanceRepository(internal val database: AppDatabase, private val context: android.content.Context) {
+
+    private val settingsDao = database.settingsDao()
+    private val commitmentDao = database.commitmentDao()
+    private val transactionDao = database.transactionDao()
+    private val customCategoryDao = database.customCategoryDao()
+    private val deletedItemDao = database.deletedItemDao()
+    private val habayebDao = database.habayebDao()
+
+    private val sourceDar = context.getString(com.example.R.string.source_system_dar)
+    private val sourceHabayeb = context.getString(com.example.R.string.source_system_habayeb)
+
+    // Flow Exposures
+    val settingsFlow: Flow<AppSettings?> = settingsDao.getSettingsFlow()
+    val commitmentsFlow: Flow<List<FixedCommitment>> = commitmentDao.getAllCommitmentsFlow()
+    val transactionsFlow: Flow<List<TransactionDb>> = transactionDao.getAllTransactionsFlow()
+    val customCategoriesFlow: Flow<List<CustomCategory>> = customCategoryDao.getAllCustomCategoriesFlow()
+    val deletedItemsFlow: Flow<List<DeletedItemEntity>> = deletedItemDao.getAllDeletedItemsFlow()
+    val habayebCustomersFlow: Flow<List<HabayebCustomer>> = habayebDao.getAllCustomersFlow()
+    val habayebTransactionsFlow: Flow<List<HabayebTransaction>> = habayebDao.getAllTransactionsFlow()
+
+    fun getTransactionsForCustomerFlow(customerId: String): Flow<List<HabayebTransaction>> = 
+        habayebDao.getTransactionsForCustomerFlow(customerId)
+
+    fun getTransactionsPagingSourceForCustomer(customerId: String): androidx.paging.PagingSource<Int, HabayebTransaction> =
+        habayebDao.getTransactionsPagingSourceForCustomer(customerId)
+
+    // Deleted Items Trash
+    suspend fun saveDeletedItem(item: DeletedItemEntity) = deletedItemDao.insertDeletedItem(item)
+    suspend fun removeDeletedItem(item: DeletedItemEntity) = deletedItemDao.deleteItem(item)
+    suspend fun removeDeletedItemById(id: String) = deletedItemDao.deleteItemById(id)
+    suspend fun clearDeletedItems() = deletedItemDao.clearAllDeletedItems()
+
+    // Settings
+    suspend fun getSettingsDirect(): AppSettings? = settingsDao.getSettingsDirect()
+    suspend fun saveSettings(settings: AppSettings) = settingsDao.insertOrUpdateSettings(settings)
+
+    // Commitments
+    suspend fun saveCommitment(commitment: FixedCommitment) = commitmentDao.insertCommitment(commitment)
+    suspend fun updateCommitments(commitments: List<FixedCommitment>) = commitmentDao.updateCommitments(commitments)
+    suspend fun deleteCommitment(name: String) = commitmentDao.deleteCommitment(name)
+    suspend fun clearCommitments() = commitmentDao.clearAllCommitments()
+
+    // Transactions
+    suspend fun getTransactionById(id: String): TransactionDb? = transactionDao.getTransactionById(id)
+    suspend fun saveTransaction(transaction: TransactionDb) = transactionDao.insertTransaction(transaction)
+    suspend fun deleteTransaction(transaction: TransactionDb) = transactionDao.deleteTransaction(transaction)
+    suspend fun deleteTransactionById(id: String) = transactionDao.deleteTransactionById(id)
+    suspend fun clearTransactions() = transactionDao.clearAllTransactions()
+
+    // Custom Categories
+    suspend fun saveCustomCategory(category: CustomCategory) = customCategoryDao.insertCategory(category)
+    suspend fun deleteCustomCategory(category: CustomCategory) = customCategoryDao.deleteCategory(category)
+    suspend fun clearCustomCategories() = customCategoryDao.clearAllCustomCategories()
+
+    // Habayeb (حسابات الحبايب) operations
+    suspend fun insertCustomer(customer: HabayebCustomer) = habayebDao.insertCustomer(customer)
+    suspend fun updateCustomer(customer: HabayebCustomer) = habayebDao.updateCustomer(customer)
+    suspend fun insertCustomerWithOpeningTransaction(customer: HabayebCustomer, transaction: HabayebTransaction?) = 
+        habayebDao.insertCustomerWithOpeningTransaction(customer, transaction)
+    suspend fun deleteCustomerAndTransactions(customerId: String) = habayebDao.deleteCustomerAndTransactions(customerId)
+    suspend fun updateCustomerName(id: String, newName: String) = habayebDao.updateCustomerName(id, newName)
+    suspend fun insertHabayebTransaction(transaction: HabayebTransaction) = habayebDao.insertTransaction(transaction)
+    suspend fun deleteHabayebTransaction(transaction: HabayebTransaction) = habayebDao.deleteTransaction(transaction)
+    suspend fun deleteHabayebTransactionById(id: String) = habayebDao.deleteTransactionById(id)
+    suspend fun getHabayebTransactionById(id: String): HabayebTransaction? = habayebDao.getTransactionById(id)
+    suspend fun getAllCustomersDirect(): List<HabayebCustomer> = habayebDao.getAllCustomersDirect()
+    suspend fun getAllTransactionsDirect(): List<HabayebTransaction> = habayebDao.getAllTransactionsDirect()
+    suspend fun clearAllCustomers() = habayebDao.clearAllCustomers()
+    suspend fun clearAllTransactions() = habayebDao.clearAllTransactions()
+
+    // Clean critical master reset
+    suspend fun deleteAllData(): Unit = withContext(Dispatchers.IO) {
+        try {
+            database.withTransaction {
+                transactionDao.clearAllTransactions()
+                commitmentDao.clearAllCommitments()
+                customCategoryDao.clearAllCustomCategories()
+                deletedItemDao.clearAllDeletedItems()
+                habayebDao.clearAllCustomers()
+                habayebDao.clearAllTransactions()
+                settingsDao.insertOrUpdateSettings(AppSettings(isFirstLaunch = false))
+            }
+        } catch (e: Exception) {
+            Log.e("FinanceRepository", "Error inside deleteAllData: ${e.message}", e)
+            throw e
+        }
+    }
+
+    suspend fun softDeleteCommitmentToTrash(fc: FixedCommitment) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            put("name", fc.name)
+            put("targetAmount", fc.targetAmount)
+            put("currentProgress", fc.currentProgress)
+            put("orderIndex", fc.orderIndex)
+        }.toString()
+        val trashItem = DeletedItemEntity(id = "fc_${fc.name}", sourceSystem = sourceDar, originalTableName = "fixed_commitments", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun softDeleteHabayebBundleToTrash(customer: HabayebCustomer, transactions: List<HabayebTransaction>) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            put("customer", JSONObject().apply {
+                put("id", customer.id)
+                put("name", customer.name)
+                put("phone", customer.phone)
+                put("notes", customer.notes)
+                put("createdAt", customer.createdAt)
+            })
+            val txsArray = JSONArray()
+            transactions.forEach { tx ->
+                txsArray.put(JSONObject().apply {
+                    put("id", tx.id)
+                    put("customerId", tx.customerId)
+                    put("type", tx.type)
+                    put("amount", tx.amount)
+                    put("timestamp", tx.timestamp)
+                    put("description", tx.description)
+                    put("linkedMainTxId", tx.linkedMainTxId ?: JSONObject.NULL)
+                    put("is_foreign", tx.is_foreign)
+                    put("currency_code", tx.currency_code)
+                    put("foreign_amount", tx.foreign_amount)
+                    put("exchange_rate", tx.exchange_rate)
+                    put("is_rate_calculated", tx.is_rate_calculated)
+                    put("equivalent_amount", tx.equivalent_amount)
+                })
+            }
+            put("transactions", txsArray)
+            put("totalTransactions", transactions.size)
+            put("name", customer.name) // For easy display
+        }.toString()
+        val trashItem = DeletedItemEntity(id = "bundle_${customer.id}", sourceSystem = sourceHabayeb, originalTableName = "habayeb_bundle", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun softDeleteHabayebCustomerToTrash(customer: HabayebCustomer) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            put("id", customer.id)
+            put("name", customer.name)
+            put("phone", customer.phone)
+            put("notes", customer.notes)
+            put("createdAt", customer.createdAt)
+        }.toString()
+        val trashItem = DeletedItemEntity(id = "cust_${customer.id}", sourceSystem = sourceHabayeb, originalTableName = "habayeb_customers", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun softDeleteTransactionToTrash(tx: TransactionDb) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            put("id", tx.id)
+            put("timestamp", tx.timestamp)
+            put("type", tx.type)
+            put("category", tx.category)
+            put("amount", tx.amount)
+            put("description", tx.description)
+        }.toString()
+        val trashItem = DeletedItemEntity(id = tx.id, sourceSystem = sourceDar, originalTableName = "transactions", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun softDeleteTransactionBundleToTrash(transactions: List<TransactionDb>, title: String) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            val txsArray = JSONArray()
+            transactions.forEach { tx ->
+                txsArray.put(JSONObject().apply {
+                    put("id", tx.id)
+                    put("timestamp", tx.timestamp)
+                    put("type", tx.type)
+                    put("category", tx.category)
+                    put("amount", tx.amount)
+                    put("description", tx.description)
+                })
+            }
+            put("transactions", txsArray)
+            put("totalTransactions", transactions.size)
+            val totalNet = transactions.sumOf { if (it.type == "INCOME") it.amount else -it.amount }
+            put("totalNet", totalNet)
+            put("name", title)
+        }.toString()
+        val id = "dar_bundle_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(4)}"
+        val trashItem = DeletedItemEntity(id = id, sourceSystem = sourceDar, originalTableName = "dar_bundle", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun softDeleteHabayebTransactionToTrash(tx: HabayebTransaction) = withContext(Dispatchers.IO) {
+        val jsonData = JSONObject().apply {
+            put("id", tx.id)
+            put("customerId", tx.customerId)
+            put("type", tx.type)
+            put("amount", tx.amount)
+            put("timestamp", tx.timestamp)
+            put("description", tx.description)
+            put("linkedMainTxId", tx.linkedMainTxId ?: JSONObject.NULL)
+            put("is_foreign", tx.is_foreign)
+            put("currency_code", tx.currency_code)
+            put("foreign_amount", tx.foreign_amount)
+            put("exchange_rate", tx.exchange_rate)
+            put("is_rate_calculated", tx.is_rate_calculated)
+            put("equivalent_amount", tx.equivalent_amount)
+        }.toString()
+        val trashItem = DeletedItemEntity(id = tx.id, sourceSystem = sourceHabayeb, originalTableName = "habayeb_transactions", jsonData = jsonData)
+        saveDeletedItem(trashItem)
+    }
+
+    suspend fun populateDefaultCategoriesIfNeeded(shouldPopulate: Boolean, context: android.content.Context) = withContext(Dispatchers.IO) {
+        if (shouldPopulate) {
+            val tabFood = context.getString(com.example.R.string.tab_food)
+            val tabBills = context.getString(com.example.R.string.tab_bills)
+            val tabFamily = context.getString(com.example.R.string.tab_family)
+            val tabSavings = context.getString(com.example.R.string.tab_savings)
+
+            val defaults = listOf(
+                CustomCategory(name = context.getString(com.example.R.string.category_flour), tabType = tabFood, iconEmoji = "🌾"),
+                CustomCategory(name = context.getString(com.example.R.string.category_sugar), tabType = tabFood, iconEmoji = "🍬"),
+                CustomCategory(name = context.getString(com.example.R.string.category_rice), tabType = tabFood, iconEmoji = "🍚"),
+                CustomCategory(name = context.getString(com.example.R.string.category_spices), tabType = tabFood, iconEmoji = "🌶️"),
+                CustomCategory(name = context.getString(com.example.R.string.category_legumes), tabType = tabFood, iconEmoji = "🫘"),
+                CustomCategory(name = context.getString(com.example.R.string.category_tea), tabType = tabFood, iconEmoji = "☕"),
+                CustomCategory(name = context.getString(com.example.R.string.category_vegetables), tabType = tabFood, iconEmoji = "🛒"),
+                CustomCategory(name = context.getString(com.example.R.string.category_gas), tabType = tabBills, iconEmoji = "🔥"),
+                CustomCategory(name = context.getString(com.example.R.string.category_electricity), tabType = tabBills, iconEmoji = "⚡"),
+                CustomCategory(name = context.getString(com.example.R.string.category_water), tabType = tabBills, iconEmoji = "💧"),
+                CustomCategory(name = context.getString(com.example.R.string.category_internet), tabType = tabBills, iconEmoji = "🌐"),
+                CustomCategory(name = context.getString(com.example.R.string.category_milk), tabType = tabFamily, iconEmoji = "🍼"),
+                CustomCategory(name = context.getString(com.example.R.string.category_diapers), tabType = tabFamily, iconEmoji = "👶"),
+                CustomCategory(name = context.getString(com.example.R.string.category_school), tabType = tabFamily, iconEmoji = "🎒"),
+                CustomCategory(name = context.getString(com.example.R.string.category_other), tabType = tabSavings, iconEmoji = "📁"),
+                CustomCategory(name = context.getString(com.example.R.string.category_savings), tabType = tabSavings, iconEmoji = "🏦"),
+                CustomCategory(name = context.getString(com.example.R.string.category_emergency), tabType = tabSavings, iconEmoji = "🚨"),
+                CustomCategory(name = context.getString(com.example.R.string.category_medical), tabType = tabSavings, iconEmoji = "💊"),
+                CustomCategory(name = context.getString(com.example.R.string.category_furniture), tabType = tabSavings, iconEmoji = "🛋️")
+            )
+            defaults.forEach { saveCustomCategory(it) }
+        }
+    }
+}
