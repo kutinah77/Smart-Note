@@ -382,7 +382,7 @@ fun AddTransactionPopup(
         showCalculator = showCalculator,
         onDismissCalculator = { showCalculator = false },
         onValueConfirmed = { value ->
-            amountStr = value.toInt().toString()
+            amountStr = if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
             showCalculator = false
         },
         activeThemeColor = activeThemeColor,

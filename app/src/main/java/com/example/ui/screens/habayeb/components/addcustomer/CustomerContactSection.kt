@@ -29,11 +29,45 @@ import com.example.domain.StringUtils.getContactDetails
 fun CustomerContactSection(
     nameStr: String,
     onNameChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+    initialAmountFocusRequester: FocusRequester,
+    activeThemeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // 1. الاسم (Account Name Input)
+        OutlinedTextField(
+            value = nameStr,
+            onValueChange = onNameChange,
+            label = { Text(stringResource(id = R.string.hint_account_name), fontSize = 10.sp) },
+            placeholder = { Text(stringResource(id = R.string.habayeb_edit_name_desc), fontSize = 10.sp) },
+            singleLine = true,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { initialAmountFocusRequester.requestFocus() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = activeThemeColor,
+                focusedLabelColor = activeThemeColor,
+                cursorColor = activeThemeColor,
+                unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f)
+            )
+        )
+    }
+}
+
+@Composable
+fun CustomerPhoneSection(
     phoneStr: String,
     onPhoneChange: (String) -> Unit,
-    focusRequester: FocusRequester,
+    nameStr: String,
+    onNameChange: (String) -> Unit,
     phoneFocusRequester: FocusRequester,
-    initialAmountFocusRequester: FocusRequester,
     activeThemeColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -71,27 +105,6 @@ fun CustomerContactSection(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // 1. الاسم (Account Name Input)
-        OutlinedTextField(
-            value = nameStr,
-            onValueChange = onNameChange,
-            label = { Text(stringResource(id = R.string.hint_account_name), fontSize = 10.sp) },
-            placeholder = { Text(stringResource(id = R.string.habayeb_edit_name_desc), fontSize = 10.sp) },
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { initialAmountFocusRequester.requestFocus() }),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = activeThemeColor,
-                focusedLabelColor = activeThemeColor,
-                cursorColor = activeThemeColor,
-                unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f)
-            )
-        )
-
         // 5. رقم الهاتف (Phone Input)
         OutlinedTextField(
             value = phoneStr,

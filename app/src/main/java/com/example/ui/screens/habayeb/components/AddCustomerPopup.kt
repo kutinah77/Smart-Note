@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.ui.screens.CalculatorDialog
 import com.example.ui.screens.habayeb.components.addcustomer.CustomerContactSection
+import com.example.ui.screens.habayeb.components.addcustomer.CustomerPhoneSection
 import com.example.ui.screens.habayeb.components.addcustomer.CurrencyPickerRow
 import com.example.ui.screens.habayeb.components.addcustomer.InitialBalanceSection
 import com.example.ui.screens.habayeb.utils.CurrencyConfig
@@ -165,20 +166,17 @@ fun AddCustomerPopup(
                                 Spacer(modifier = Modifier.size(24.dp))
                             }
 
-                            // 1. Customer Contact Section
+                            // 1. Customer Contact Section (Name only)
                             CustomerContactSection(
                                 nameStr = uiState.nameStr,
                                 onNameChange = { uiState = uiState.copy(nameStr = it) },
-                                phoneStr = uiState.phoneStr,
-                                onPhoneChange = { uiState = uiState.copy(phoneStr = it) },
                                 focusRequester = focusRequester,
-                                phoneFocusRequester = phoneFocusRequester,
                                 initialAmountFocusRequester = initialAmountFocusRequester,
                                 activeThemeColor = activeThemeColor,
                                 modifier = Modifier.fillMaxWidth()
                             )
 
-                            // 2. Initial Balance Section
+                            // 2. Initial Balance Section (Amount & Notes/Statement)
                             InitialBalanceSection(
                                 initialAmountStr = uiState.initialAmountStr,
                                 onInitialAmountChange = { uiState = uiState.copy(initialAmountStr = it) },
@@ -192,6 +190,17 @@ fun AddCustomerPopup(
                                 onShowCalculator = { uiState = uiState.copy(showCalculator = true) },
                                 selectedCalendar = uiState.selectedCalendar,
                                 onDateSelected = { uiState = uiState.copy(selectedCalendar = it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 3. Customer Phone Section (Last Input Field)
+                            CustomerPhoneSection(
+                                phoneStr = uiState.phoneStr,
+                                onPhoneChange = { uiState = uiState.copy(phoneStr = it) },
+                                nameStr = uiState.nameStr,
+                                onNameChange = { uiState = uiState.copy(nameStr = it) },
+                                phoneFocusRequester = phoneFocusRequester,
+                                activeThemeColor = activeThemeColor,
                                 modifier = Modifier.fillMaxWidth()
                             )
 

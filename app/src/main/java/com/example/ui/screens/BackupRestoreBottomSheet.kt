@@ -29,7 +29,6 @@ import com.example.R
 import com.example.data.CloudSyncState
 import com.example.data.local.entities.AppSettings
 import com.example.ui.screens.settings.components.*
-import com.example.ui.screens.settings.rememberGoogleAuthManager
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.SoftRed
 import com.example.ui.viewmodel.FinanceViewModel
@@ -52,6 +51,7 @@ sealed class BackupUiDialog {
 fun BackupRestoreBottomSheet(
     settings: AppSettings,
     viewModel: FinanceViewModel,
+    googleAuthManager: com.example.ui.screens.settings.GoogleAuthManager,
     onExportMzd: () -> Unit,
     onImportMzd: () -> Unit,
     onImportBase64: (String) -> Unit,
@@ -69,8 +69,6 @@ fun BackupRestoreBottomSheet(
     var isSyncLoggingOut by remember { mutableStateOf(false) }
     var activeDialog by remember { mutableStateOf<BackupUiDialog>(BackupUiDialog.None) }
     var pasteText by remember { mutableStateOf("") }
-
-    val googleAuthManager = rememberGoogleAuthManager(viewModel, context)
 
     LaunchedEffect(googleSyncState) {
         if (googleSyncState is CloudSyncState.SessionExpired) {

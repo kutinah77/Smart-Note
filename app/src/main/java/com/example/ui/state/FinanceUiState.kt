@@ -11,5 +11,6 @@ data class FinanceUiState(
     val tabOrder: String = "HABAYEB,LEDGER,MAKHZAN",
     val defaultStartDestination: String = "HABAYEB",
     val linkHabayebDebts: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val isLoading: Boolean = true
 )

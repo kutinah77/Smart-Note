@@ -28,6 +28,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+import com.example.ui.screens.settings.rememberGoogleAuthManager
+import com.example.ui.screens.settings.rememberStorageManager
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppLayout(
@@ -70,50 +73,9 @@ fun MainAppLayout(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val safExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        if (uri != null) {
-            viewModel.getBackupJsonForClipboard { jsonStr ->
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                                outputStream.write(jsonStr.toByteArray())
-                            }
-                        }
-                        Toast.makeText(context, context.getString(R.string.toast_backup_export_success), Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, context.getString(R.string.toast_backup_export_failed), Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    }
-
-    val safRestoreLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    val jsonText = withContext(Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
-                    }
-                    if (jsonText.isNotBlank()) {
-                        viewModel.executeMasterRestore(jsonText, context) { success, _ ->
-                            if (success) {
-                                Toast.makeText(context, context.getString(R.string.toast_restore_success), Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, context.getString(R.string.toast_restore_invalid_file), Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+    val googleAuthManager = rememberGoogleAuthManager(viewModel, context)
+    val storageManager = rememberStorageManager(viewModel, context) {
+        // AppSettings is reactively observed, so UI refreshes automatically upon database restoration
     }
 
     BackHandler {
@@ -189,6 +151,8 @@ fun MainAppLayout(
                     currentScreen = currentScreen,
                     viewModel = viewModel,
                     settings = settings,
+                    googleAuthManager = googleAuthManager,
+                    storageManager = storageManager,
                     contentPadding = innerPadding,
                     onNavigate = { currentScreen = it },
                     onMenuClick = { scope.launch { drawerState.open() } },
@@ -221,12 +185,13 @@ fun MainAppLayout(
         BackupRestoreBottomSheet(
             settings = settings,
             viewModel = viewModel,
+            googleAuthManager = googleAuthManager,
             onExportMzd = {
                 val dateStr = sdfName.format(java.util.Date())
-                safExportLauncher.launch("Mizan_$dateStr.mzd")
+                storageManager.exportBackup("Mizan_$dateStr.mzd")
             },
             onImportMzd = {
-                safRestoreLauncher.launch(arrayOf("application/*"))
+                storageManager.restoreBackup()
             },
             onImportBase64 = { base64JsonText ->
                 viewModel.executeMasterRestore(base64JsonText, context) { success, _ ->

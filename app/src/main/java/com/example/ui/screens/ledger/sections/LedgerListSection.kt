@@ -134,8 +134,17 @@ fun LedgerListSection(
             )
         }
 
-        // No data placeholder
-        if (monthlyLedger.isEmpty()) {
+        if (!isScreenReady) {
+            item(key = "loading_skeleton") {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = EmeraldPrimary,
+                        strokeWidth = 3.dp
+                    )
+                }
+            }
+        } else if (monthlyLedger.isEmpty()) {
             item(key = "empty_state") {
                 Column(
                     modifier = Modifier
@@ -151,19 +160,6 @@ fun LedgerListSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         lineHeight = 18.sp
-                    )
-                }
-            }
-        }
-
-        // Performance Profile: Deferred Loading for heavy list items
-        if (!isScreenReady && monthlyLedger.isNotEmpty()) {
-            item(key = "loading_skeleton") {
-                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = EmeraldPrimary,
-                        strokeWidth = 3.dp
                     )
                 }
             }

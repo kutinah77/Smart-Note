@@ -98,6 +98,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    val isTransactionsLoaded = MutableStateFlow(false)
+    val isHabayebCustomersLoaded = MutableStateFlow(false)
+    val isHabayebTransactionsLoaded = MutableStateFlow(false)
+
     init {
         appPreferencesRepository.registerOnSharedPreferenceChangeListener(preferenceListener)
         viewModelScope.launch(Dispatchers.IO) {
@@ -110,7 +114,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                     tabOrder = appPreferencesRepository.tabOrderFlow.firstOrNull() ?: NavigationPreferences.DEFAULT_ORDER,
                     defaultStartDestination = appPreferencesRepository.defaultStartFlow.firstOrNull() ?: NavigationPreferences.DEFAULT_START,
                     linkHabayebDebts = appPreferencesRepository.isLinkHabayebDebtsEnabled(),
-                    isPrivacyModeEnabled = _uiState.value.isPrivacyModeEnabled
+                    isPrivacyModeEnabled = _uiState.value.isPrivacyModeEnabled,
+                    isLoading = false
                 )
             }
             refreshLocalBackups()
@@ -134,6 +139,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val commitmentsState: StateFlow<List<FixedCommitment>> = repository.commitmentsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val transactionsState: StateFlow<List<TransactionDb>> = repository.transactionsFlow
+        .onEach { isTransactionsLoaded.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val customCategoriesState: StateFlow<List<CustomCategory>> = repository.customCategoriesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -166,8 +172,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun isTrialExpired(): Boolean = licenseValidationUseCase.isTrialExpired(totalTransactionsCount.value, isActivatedState.value)
 
     val habayebCustomersState: StateFlow<List<HabayebCustomer>> = repository.habayebCustomersFlow
+        .onEach { isHabayebCustomersLoaded.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val habayebTransactionsState: StateFlow<List<HabayebTransaction>> = repository.habayebTransactionsFlow
+        .onEach { isHabayebTransactionsLoaded.value = true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalTransactionsCount: StateFlow<Int> = combine(transactionsState, habayebTransactionsState) { main, habayeb ->
@@ -183,11 +191,12 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     fun markOnboardingShown() = appPreferencesRepository.setOnboardingShown(true)
 
     val customersUiState: StateFlow<com.example.ui.state.CustomersUiState> = combine(
-        habayebCustomersState, habayebTransactionsState, settingsState
-    ) { customers, transactions, settings ->
-        habayebBusinessLogicUseCase.execute(customers, transactions, settings)
+        habayebCustomersState, habayebTransactionsState, settingsState, isHabayebCustomersLoaded, isHabayebTransactionsLoaded
+    ) { customers, transactions, settings, custLoaded, txLoaded ->
+        val state = habayebBusinessLogicUseCase.execute(customers, transactions, settings)
+        state.copy(isLoading = !(custLoaded && txLoaded))
     }.flowOn(Dispatchers.Default)
-     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.ui.state.CustomersUiState())
+     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.ui.state.CustomersUiState(isLoading = true))
 
     val habayebOwedByThemTotalState: StateFlow<BigDecimal> = customersUiState.map { it.totalOwedByThem }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BigDecimal.ZERO)
@@ -340,10 +349,10 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Pair(BigDecimal.ZERO, BigDecimal.ZERO))
 
     val ledgerUiState: StateFlow<com.example.ui.state.MainLedgerUiState> = combine(
-        searchResultsState, totalCashState, searchQuery
-    ) { txList, totalCash, query ->
-        com.example.ui.state.MainLedgerUiState(transactions = txList, totalCash = totalCash.toDouble(), isSearching = query.isNotBlank(), isLoading = false)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.ui.state.MainLedgerUiState())
+        searchResultsState, totalCashState, searchQuery, isTransactionsLoaded
+    ) { txList, totalCash, query, loaded ->
+        com.example.ui.state.MainLedgerUiState(transactions = txList, totalCash = totalCash.toDouble(), isSearching = query.isNotBlank(), isLoading = !loaded)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.ui.state.MainLedgerUiState(isLoading = true))
 
     val monthlyLedgerState: StateFlow<List<MonthLedger>> = transactionsState
         .map { calculateLedgerUseCase.execute(it) }

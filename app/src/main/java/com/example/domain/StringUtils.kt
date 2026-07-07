@@ -106,12 +106,12 @@ object FormatUtils {
         val finalSymbol = symbol.ifEmpty { context?.getString(com.example.R.string.currency_yer) ?: "ر.ي" }
         return try {
             val symbols = DecimalFormatSymbols(Locale.ENGLISH)
-            val formatter = DecimalFormat("#,##0", symbols)
+            val formatter = DecimalFormat("#,##0.##", symbols)
             val formatted = formatter.format(amount)
             "$formatted $finalSymbol"
         } catch (e: Exception) {
             val symbols = DecimalFormatSymbols(Locale.ENGLISH)
-            val formatter = DecimalFormat("#,##0", symbols)
+            val formatter = DecimalFormat("#,##0.##", symbols)
             val formatted = formatter.format(amount)
             "$formatted $finalSymbol"
         }
@@ -122,12 +122,12 @@ object FormatUtils {
         val finalSymbol = symbol.ifEmpty { context?.getString(com.example.R.string.currency_yer) ?: "ر.ي" }
         return try {
             val symbols = DecimalFormatSymbols(Locale.ENGLISH)
-            val formatter = DecimalFormat("#,##0", symbols)
+            val formatter = DecimalFormat("#,##0.##", symbols)
             val formatted = formatter.format(amount)
             "$formatted $finalSymbol"
         } catch (e: Exception) {
             val symbols = DecimalFormatSymbols(Locale.ENGLISH)
-            val formatter = DecimalFormat("#,##0", symbols)
+            val formatter = DecimalFormat("#,##0.##", symbols)
             val formatted = formatter.format(amount)
             "$formatted $finalSymbol"
         }

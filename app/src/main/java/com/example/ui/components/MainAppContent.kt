@@ -22,6 +22,8 @@ fun MainAppContent(
     currentScreen: Screen,
     viewModel: FinanceViewModel,
     settings: AppSettings,
+    googleAuthManager: com.example.ui.screens.settings.GoogleAuthManager,
+    storageManager: com.example.ui.screens.settings.StorageManager,
     contentPadding: PaddingValues = PaddingValues(),
     onNavigate: (Screen) -> Unit,
     onMenuClick: () -> Unit,
@@ -58,6 +60,8 @@ fun MainAppContent(
                     SettingsView(
                         viewModel = viewModel,
                         settings = settings,
+                        googleAuthManager = googleAuthManager,
+                        storageManager = storageManager,
                         onNavigateToSecurity = { onNavigate(Screen.SECURITY) },
                         contentPadding = contentPadding
                     )

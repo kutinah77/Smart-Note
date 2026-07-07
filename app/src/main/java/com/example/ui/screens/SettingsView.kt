@@ -30,8 +30,6 @@ import com.example.ui.helper.PermissionHelper
 import com.example.ui.helper.rememberBackupPermissionHelper
 import com.example.ui.screens.habayeb.components.ExchangeRateSetupDialog
 import com.example.ui.screens.settings.components.*
-import com.example.ui.screens.settings.rememberGoogleAuthManager
-import com.example.ui.screens.settings.rememberStorageManager
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.FinanceViewModel
 
@@ -40,6 +38,8 @@ import com.example.ui.viewmodel.FinanceViewModel
 fun SettingsView(
     viewModel: FinanceViewModel,
     settings: AppSettings,
+    googleAuthManager: com.example.ui.screens.settings.GoogleAuthManager,
+    storageManager: com.example.ui.screens.settings.StorageManager,
     onNavigateToSecurity: () -> Unit,
     contentPadding: PaddingValues = PaddingValues()
 ) {
@@ -73,11 +73,10 @@ fun SettingsView(
     var showSetupDialog by remember { mutableStateOf(false) }
     var isAutoBackupEnabled by remember { mutableStateOf(settings.isAutoBackupEnabled) }
 
-    // Centralized Infrastructure managers
-    val googleAuthManager = rememberGoogleAuthManager(viewModel, context)
-    val storageManager = rememberStorageManager(viewModel, context) { restoredSettings ->
-        currencySymbol = restoredSettings.currencySymbol
+    LaunchedEffect(settings.currencySymbol) {
+        currencySymbol = settings.currencySymbol
     }
+
     val permissionHelper = rememberBackupPermissionHelper(context) {
         onPermissionGrantedCallback?.invoke()
     }

@@ -195,7 +195,7 @@ fun HabayebScreen(
                 // Main customer list and selection section
                 HabayebListSection(
                     filteredCustomers = filteredCustomers,
-                    isScreenReady = true,
+                    isScreenReady = !customersState.isLoading,
                     isPrivacyMode = isPrivacyModeState.value,
                     isMultiSelectActive = isMultiSelectActive,
                     onMultiSelectActiveChanged = { isMultiSelectActive = it },

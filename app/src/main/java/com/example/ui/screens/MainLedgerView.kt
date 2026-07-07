@@ -67,6 +67,8 @@ fun MainLedgerView(
     val totalCash by viewModel.totalCashState.collectAsStateWithLifecycle()
     val commitments by viewModel.commitmentsState.collectAsStateWithLifecycle()
     val monthlyLedger by viewModel.monthlyLedgerState.collectAsStateWithLifecycle()
+    val ledgerUiState by viewModel.ledgerUiState.collectAsStateWithLifecycle()
+    val isScreenReady = !ledgerUiState.isLoading
 
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -191,7 +193,7 @@ fun MainLedgerView(
             commitments = commitments,
             computedCommitments = computedCommitments,
             linkHabayebDebts = linkHabayebDebts,
-            isScreenReady = uiState.isScreenReady,
+            isScreenReady = isScreenReady,
             collapsedMonths = uiState.collapsedMonths,
             onCollapsedMonthsChange = { uiState = uiState.copy(collapsedMonths = it) },
             isSelectionMode = uiState.isSelectionMode,

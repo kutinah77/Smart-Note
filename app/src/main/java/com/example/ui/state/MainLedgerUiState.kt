@@ -8,5 +8,5 @@ data class MainLedgerUiState(
     val transactions: List<TransactionDb> = emptyList(),
     val totalCash: Double = 0.0,
     val isSearching: Boolean = false,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = true
 )

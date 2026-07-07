@@ -27,7 +27,7 @@ fun getInitialColor(name: String): Color {
 fun formatCurrency(amount: Double, currencySymbol: String): String {
     val absVal = kotlin.math.abs(amount)
     val symbols = DecimalFormatSymbols(Locale.ENGLISH)
-    val formatter = DecimalFormat("#,##0", symbols)
+    val formatter = DecimalFormat("#,##0.##", symbols)
     val sign = ""
     return "$sign${formatter.format(absVal)} $currencySymbol"
 }
